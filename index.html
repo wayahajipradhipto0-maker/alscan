@@ -1,9 +1,10 @@
+cat > ~/alscan.html << 'EOF'
 <!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AL SCAN CLEAN</title>
+<title>AL SCAN GEMINI</title>
 <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
 <style>
 body{font-family:sans-serif;background:#020617;color:#e2e8f0;margin:0;padding:10px}
@@ -21,28 +22,23 @@ video{width:100%;display:block}
 </head>
 <body>
 <div class="container">
-  <h1>📚 AL SCAN CLEAN</h1>
+  <h1>📚 AL SCAN GEMINI AI</h1>
   <button class="btn" onclick="startCam()">📷 NYALAIN KAMERA</button>
   <div class="vidbox">
     <video id="video" autoplay playsinline></video>
     <div class="guide"></div>
   </div>
-  <button class="btn" onclick="capture()">📸 SCAN + BERSIHIN + JAWAB</button>
+  <button class="btn" onclick="capture()">📸 SCAN + JAWAB BENERAN</button>
 
-  <div id="loading">⏳ Proses 20 detik...</div>
+  <div id="loading">⏳ Scan 10 detik + Mikir 10 detik...</div>
 
   <div class="card">
-    <div class="tag">HASIL OCR KOTOR</div>
-    <div id="kotor">-</div>
-  </div>
-  
-  <div class="card">
-    <div class="tag">SOAL UDAH DIBERSIHIN</div>
+    <div class="tag">HASIL SCAN SOAL</div>
     <div id="soal">-</div>
   </div>
 
   <div class="card">
-    <div class="tag">JAWABAN AI</div>
+    <div class="tag">JAWABAN GEMINI AI</div>
     <div id="jawaban">-</div>
     <button class="btn" style="background:#1e293b;color:#38bdf8;margin-top:12px" onclick="copyJawaban()">📋 COPY JAWABAN</button>
   </div>
@@ -55,6 +51,9 @@ let stream;
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
 
+// GANTI PAKE API KEY GRATIS LU SENDIRI DARI: https://aistudio.google.com/app/apikey
+const GEMINI_KEY = 'AIzaSyB-isi-key-lu-disini';
+
 async function startCam(){
   try{
     stream = await navigator.mediaDevices.getUserMedia({
@@ -66,55 +65,59 @@ async function startCam(){
 
 function bersihinTeks(teks){
   return teks
-    .replace(/[^\w\s\d\.\,\+\-\=\:\(\)\/\?\®\³\²]/g, '') // buang simbol aneh
-    .replace(/®/g, '³') // benerin pangkat 3
-    .replace(/\s+/g, ' ') // spasi dobel jadi 1
-    .replace(/\s\./g, '.') // spasi sebelum titik
-    .replace(/\s\,/g, ',') // spasi sebelum koma
-    .replace(/d4/g, '') // buang noise "d4" 
-    .replace(/^a aa/g, '') // buang noise awal
-    .replace(/Py pp|Nw/gi, '') // buang noise akhir
-    .replace(/disebut i/g, 'disebut') // benerin "disebut i"
-    .trim();
+   .replace(/[^\w\s\d\.\,\+\-\=\:\(\)\/\?\³\²]/g, '')
+   .replace(/®/g, '³')
+   .replace(/\s+/g, ' ')
+   .replace(/d4|a aa|Py pp|Nw/gi, '')
+   .replace(/disebut i/g, 'disebut')
+   .trim();
+}
+
+async function tanyaGemini(soal){
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_KEY}`;
+  const body = {
+    contents: [{
+      parts: [{text: `Kamu adalah guru matematika SMP. Jawab soal ini singkat, jelas, langsung ke intinya dalam Bahasa Indonesia. Jika pilihan ganda, sebut huruf jawabannya. Soal: ${soal}`}]
+    }]
+  };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  return data.candidates[0].content.parts[0].text;
 }
 
 async function capture(){
   if(!video.srcObject) return alert('Nyalain kamera dulu');
   const loading = document.getElementById('loading');
-  const kotorEl = document.getElementById('kotor');
   const soalEl = document.getElementById('soal');
   const jawabEl = document.getElementById('jawaban');
   
   loading.style.display = 'block';
-  kotorEl.innerText = soalEl.innerText = jawabEl.innerText = 'Proses...';
+  soalEl.innerText = jawabEl.innerText = 'Proses...';
 
-  // 1. CAPTURE
+  // 1. OCR
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(video, 0, 0);
-
-  // 2. OCR
-  const { data: { text } } = await Tesseract.recognize(canvas, 'ind+eng', {
-    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,?=+():/³²-'
-  });
   
-  kotorEl.innerText = text || 'Kosong';
-  
-  // 3. BERSIHIN TEKS
+  const { data: { text } } = await Tesseract.recognize(canvas, 'ind+eng');
   const soalBersih = bersihinTeks(text);
-  soalEl.innerText = soalBersih || 'Ga ada soal kebaca';
+  soalEl.innerText = soalBersih || 'Ga kebaca';
   
-  // 4. JAWAB PAKE AI
+  // 2. TANYA GEMINI AI BENERAN
   if(soalBersih.length > 5){
     try{
-      const prompt = `Kamu guru MTK. Jawab soal ini singkat, langsung ke intinya. Kalo pilihan ganda sebut jawabannya. Soal: ${soalBersih}`;
-      const res = await fetch(`https://api.fake-gpt.workers.dev/?q=${encodeURIComponent(prompt)}`);
-      const data = await res.json();
-      jawabEl.innerText = data.result || 'AI error. Soalnya: ' + soalBersih;
+      const jawaban = await tanyaGemini(soalBersih);
+      jawabEl.innerText = jawaban;
     }catch(e){
-      jawabEl.innerText = `Jawaban manual:\nVolume kubus = s³ = 4³ = 64 dm³\nGaris AB = Tali busur`;
+      jawabEl.innerText = 'Error AI: '+e.message+'\n\nPastiin API Key Gemini udah bener.';
     }
+  } else {
+    jawabEl.innerText = 'Soal ga kebaca, ga bisa jawab';
   }
   loading.style.display = 'none';
 }
@@ -126,3 +129,4 @@ function copyJawaban(){
 </script>
 </body>
 </html>
+EOF

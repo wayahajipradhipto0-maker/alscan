@@ -21,7 +21,7 @@ video,canvas{width:100%;max-width:400px;border:2px solid #38bdf8;border-radius:1
 <button onclick="capture()">📸 SCAN SOAL</button>
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas" style="display:none"></canvas>
-<div id="loading">⏳ Lagi baca teks...</div>
+<div id="loading">⏳ Lagi baca teks... 10 detik</div>
 <div id="hasil">Hasil scan muncul di sini</div>
 
 <script>
@@ -51,9 +51,7 @@ async function capture(){
   loading.style.display = 'block';
   hasil.innerText = '';
   
-  const { data: { text } } = await Tesseract.recognize(canvas, 'ind+eng', {
-    logger: m => console.log(m)
-  });
+  const { data: { text } } = await Tesseract.recognize(canvas, 'ind+eng');
   
   loading.style.display = 'none';
   hasil.innerText = text || 'Ga kebaca bos. Coba lebih deket & fokus';

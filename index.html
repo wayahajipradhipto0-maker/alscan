@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AL SCAN V2</title>
+<style>
+body{font-family:sans-serif;background:#0f172a;color:#e2e8f0;text-align:center;padding:20px}
+h1{color:#38bdf8}
+button{background:#38bdf8;color:#0f172a;border:0;padding:15px 30px;font-size:18px;border-radius:10px;font-weight:bold}
+video{width:100%;max-width:400px;border:2px solid #38bdf8;border-radius:10px;margin-top:20px}
+#hasil{background:#1e293b;padding:15px;border-radius:10px;margin-top:20px;text-align:left}
+</style>
+</head>
+<body>
+<h1>📚 AL SCAN V2</h1>
+<p>Arahin kamera ke soal, terus pencet scan</p>
+<button onclick="startScan()">📸 SCAN SOAL</button>
+<video id="video" autoplay playsinline></video>
+<div id="hasil">Hasil scan muncul di sini...</div>
+
+<script>
+async function startScan(){
+  const video = document.getElementById('video');
+  const hasil = document.getElementById('hasil');
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject = stream;
+    hasil.innerHTML = 'Kamera nyala. Fitur OCR nyusul. Kamera HTTPS udah jalan 🔥';
+  }catch(e){
+    hasil.innerHTML = 'Error kamera: ' + e.message;
+  }
+}
+</script>
+</body>
+</html>

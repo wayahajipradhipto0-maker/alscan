@@ -3,33 +3,60 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AL SCAN V2</title>
+<title>AL SCAN V2 OCR</title>
+<script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
 <style>
-body{font-family:sans-serif;background:#0f172a;color:#e2e8f0;text-align:center;padding:20px}
-h1{color:#38bdf8}
-button{background:#38bdf8;color:#0f172a;border:0;padding:15px 30px;font-size:18px;border-radius:10px;font-weight:bold}
-video{width:100%;max-width:400px;border:2px solid #38bdf8;border-radius:10px;margin-top:20px}
-#hasil{background:#1e293b;padding:15px;border-radius:10px;margin-top:20px;text-align:left}
+body{font-family:sans-serif;background:#0f172a;color:#e2e8f0;text-align:center;padding:15px;margin:0}
+h1{color:#38bdf8;margin:10px 0}
+button{background:#38bdf8;color:#0f172a;border:0;padding:12px 25px;font-size:16px;border-radius:8px;font-weight:bold;margin:5px}
+video,canvas{width:100%;max-width:400px;border:2px solid #38bdf8;border-radius:10px;margin-top:10px}
+#hasil{background:#1e293b;padding:15px;border-radius:10px;margin-top:15px;text-align:left;white-space:pre-wrap;min-height:50px}
+#loading{display:none;color:#fbbf24}
 </style>
 </head>
 <body>
 <h1>📚 AL SCAN V2</h1>
-<p>Arahin kamera ke soal, terus pencet scan</p>
-<button onclick="startScan()">📸 SCAN SOAL</button>
+<p>Arahin ke soal → pencet SCAN</p>
+<button onclick="startCam()">📷 NYALAIN KAMERA</button>
+<button onclick="capture()">📸 SCAN SOAL</button>
 <video id="video" autoplay playsinline></video>
-<div id="hasil">Hasil scan muncul di sini...</div>
+<canvas id="canvas" style="display:none"></canvas>
+<div id="loading">⏳ Lagi baca teks...</div>
+<div id="hasil">Hasil scan muncul di sini</div>
 
 <script>
-async function startScan(){
+let stream;
+async function startCam(){
   const video = document.getElementById('video');
-  const hasil = document.getElementById('hasil');
   try{
-    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
     video.srcObject = stream;
-    hasil.innerHTML = 'Kamera nyala. Fitur OCR nyusul. Kamera HTTPS udah jalan 🔥';
   }catch(e){
-    hasil.innerHTML = 'Error kamera: ' + e.message;
+    alert('Error kamera: ' + e.message);
   }
+}
+
+async function capture(){
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const hasil = document.getElementById('hasil');
+  const loading = document.getElementById('loading');
+  
+  if(!video.srcObject) return alert('Nyalain kamera dulu bos');
+  
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  
+  loading.style.display = 'block';
+  hasil.innerText = '';
+  
+  const { data: { text } } = await Tesseract.recognize(canvas, 'ind+eng', {
+    logger: m => console.log(m)
+  });
+  
+  loading.style.display = 'none';
+  hasil.innerText = text || 'Ga kebaca bos. Coba lebih deket & fokus';
 }
 </script>
 </body>

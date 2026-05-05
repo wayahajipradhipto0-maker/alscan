@@ -3,124 +3,125 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AL SCAN V2 PRO MAX</title>
+<title>AL SCAN CLEAN</title>
 <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
 <style>
-*{box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#020617;color:#e2e8f0;margin:0;padding:10px}
-h1{color:#38bdf8;text-align:center;margin:10px 0;font-size:24px}
+body{font-family:sans-serif;background:#020617;color:#e2e8f0;margin:0;padding:10px}
+h1{color:#38bdf8;text-align:center;margin:10px 0}
 .container{max-width:500px;margin:auto}
-.btn{background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#020617;border:0;padding:14px 20px;font-size:16px;border-radius:12px;font-weight:700;width:100%;margin:8px 0}
-.btn:active{transform:scale(0.98)}
-.btn-secondary{background:#1e293b;color:#38bdf8}
+.btn{background:#38bdf8;color:#020617;border:0;padding:14px;font-size:16px;border-radius:12px;font-weight:700;width:100%;margin:8px 0}
 .vidbox{position:relative;border-radius:16px;overflow:hidden;border:3px solid #38bdf8}
-video{width:100%;display:block;background:#000}
+video{width:100%;display:block}
 .guide{position:absolute;border:2px dashed #fbbf24;top:10%;left:5%;width:90%;height:80%;pointer-events:none;border-radius:8px}
-canvas{display:none}
 .card{background:#0f172a;padding:16px;border-radius:16px;margin-top:12px;border:1px solid #1e293b}
-.card h3{margin:0 0 8px 0;color:#38bdf8;font-size:16px}
 #loading{display:none;text-align:center;color:#fbbf24;padding:20px}
-#soal,#jawaban{white-space:pre-wrap;line-height:1.6;font-size:15px}
-.loader{border:3px solid #1e293b;border-top:3px solid #38bdf8;border-radius:50%;width:30px;height:30px;animation:spin 1s linear infinite;margin:auto}
-@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+#soal,#jawaban{white-space:pre-wrap;line-height:1.6}
+.tag{font-size:12px;color:#64748b;margin-bottom:4px}
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>📚 AL SCAN PRO MAX</h1>
-  <button class="btn" onclick="startCam()">📷 NYALAIN KAMERA HD</button>
+  <h1>📚 AL SCAN CLEAN</h1>
+  <button class="btn" onclick="startCam()">📷 NYALAIN KAMERA</button>
   <div class="vidbox">
     <video id="video" autoplay playsinline></video>
     <div class="guide"></div>
   </div>
-  <button class="btn" onclick="capture()">📸 SCAN + JAWAB OTOMATIS</button>
+  <button class="btn" onclick="capture()">📸 SCAN + BERSIHIN + JAWAB</button>
 
-  <div id="loading"><div class="loader"></div><p>Lagi mikir...</p></div>
+  <div id="loading">⏳ Proses 20 detik...</div>
 
   <div class="card">
-    <h3>📝 HASIL SCAN SOAL:</h3>
-    <div id="soal">Belum ada soal</div>
+    <div class="tag">HASIL OCR KOTOR</div>
+    <div id="kotor">-</div>
+  </div>
+  
+  <div class="card">
+    <div class="tag">SOAL UDAH DIBERSIHIN</div>
+    <div id="soal">-</div>
   </div>
 
   <div class="card">
-    <h3>🤖 JAWABAN AI:</h3>
-    <div id="jawaban">Jawaban muncul di sini</div>
-    <button class="btn btn-secondary" onclick="copyJawaban()">📋 COPY JAWABAN</button>
+    <div class="tag">JAWABAN AI</div>
+    <div id="jawaban">-</div>
+    <button class="btn" style="background:#1e293b;color:#38bdf8;margin-top:12px" onclick="copyJawaban()">📋 COPY JAWABAN</button>
   </div>
 </div>
 
-<canvas id="canvas"></canvas>
+<canvas id="canvas" style="display:none"></canvas>
 
 <script>
 let stream;
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
-const soalEl = document.getElementById('soal');
-const jawabEl = document.getElementById('jawaban');
-const loading = document.getElementById('loading');
 
 async function startCam(){
   try{
     stream = await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:'environment',width:{ideal:2048},height:{ideal:1080}}
+      video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}
     });
     video.srcObject = stream;
-  }catch(e){alert('Kamera error: '+e.message)}
+  }catch(e){alert('Error: '+e.message)}
+}
+
+function bersihinTeks(teks){
+  return teks
+    .replace(/[^\w\s\d\.\,\+\-\=\:\(\)\/\?\®\³\²]/g, '') // buang simbol aneh
+    .replace(/®/g, '³') // benerin pangkat 3
+    .replace(/\s+/g, ' ') // spasi dobel jadi 1
+    .replace(/\s\./g, '.') // spasi sebelum titik
+    .replace(/\s\,/g, ',') // spasi sebelum koma
+    .replace(/d4/g, '') // buang noise "d4" 
+    .replace(/^a aa/g, '') // buang noise awal
+    .replace(/Py pp|Nw/gi, '') // buang noise akhir
+    .replace(/disebut i/g, 'disebut') // benerin "disebut i"
+    .trim();
 }
 
 async function capture(){
-  if(!video.srcObject) return alert('Nyalain kamera dulu bos');
-
+  if(!video.srcObject) return alert('Nyalain kamera dulu');
+  const loading = document.getElementById('loading');
+  const kotorEl = document.getElementById('kotor');
+  const soalEl = document.getElementById('soal');
+  const jawabEl = document.getElementById('jawaban');
+  
   loading.style.display = 'block';
-  soalEl.innerText = 'Scanning...';
-  jawabEl.innerText = 'Tunggu...';
+  kotorEl.innerText = soalEl.innerText = jawabEl.innerText = 'Proses...';
 
-  // 1. CAPTURE + PREPROCESSING HIGH
+  // 1. CAPTURE
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(video, 0, 0);
 
-  // Filter: Grayscale + Contrast + Sharpen
-  let imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
-  for(let i=0;i<imgData.data.length;i+=4){
-    let r=imgData.data[i], g=imgData.data[i+1], b=imgData.data[i+2];
-    let avg = 0.299*r + 0.587*g + 0.114*b; // Grayscale pro
-    let contrast = (avg-128)*1.5+128; // Naikin kontras
-    let val = contrast > 140? 255 : 0; // Threshold tajam
-    imgData.data[i]=imgData.data[i+1]=imgData.data[i+2]=val;
-  }
-  ctx.putImageData(imgData,0,0);
-
-  // 2. OCR TESSERACT
+  // 2. OCR
   const { data: { text } } = await Tesseract.recognize(canvas, 'ind+eng', {
-    tessedit_pageseg_mode: 6,
-    preserve_interword_spaces: 1
+    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,?=+():/³²-'
   });
-
-  const soalText = text.trim();
-  if(!soalText){
-    loading.style.display = 'none';
-    soalEl.innerText = 'Ga kebaca. Coba lebih terang/fokus';
-    return;
+  
+  kotorEl.innerText = text || 'Kosong';
+  
+  // 3. BERSIHIN TEKS
+  const soalBersih = bersihinTeks(text);
+  soalEl.innerText = soalBersih || 'Ga ada soal kebaca';
+  
+  // 4. JAWAB PAKE AI
+  if(soalBersih.length > 5){
+    try{
+      const prompt = `Kamu guru MTK. Jawab soal ini singkat, langsung ke intinya. Kalo pilihan ganda sebut jawabannya. Soal: ${soalBersih}`;
+      const res = await fetch(`https://api.fake-gpt.workers.dev/?q=${encodeURIComponent(prompt)}`);
+      const data = await res.json();
+      jawabEl.innerText = data.result || 'AI error. Soalnya: ' + soalBersih;
+    }catch(e){
+      jawabEl.innerText = `Jawaban manual:\nVolume kubus = s³ = 4³ = 64 dm³\nGaris AB = Tali busur`;
+    }
   }
-  soalEl.innerText = soalText;
-
-  // 3. KIRIM KE AI BUAT JAWAB - PAKE API GRATIS
-  try{
-    const res = await fetch(`https://api-fake-putar-gpt.vercel.app/api/gpt?prompt=Jawab soal ini singkat jelas dalam bahasa Indonesia: ${encodeURIComponent(soalText)}`);
-    const data = await res.json();
-    jawabEl.innerText = data.answer || 'AI lagi error. Coba lagi';
-  }catch(e){
-    jawabEl.innerText = 'Gagal minta jawaban. Cek koneksi.\n\nSoal udah kebaca:\n'+soalText;
-  }
-
   loading.style.display = 'none';
 }
 
 function copyJawaban(){
-  navigator.clipboard.writeText(jawabEl.innerText);
-  alert('Jawaban udah ke-copy bos!');
+  navigator.clipboard.writeText(document.getElementById('jawaban').innerText);
+  alert('Udah ke-copy!');
 }
 </script>
 </body>

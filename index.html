@@ -3,58 +3,124 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AL SCAN V2 OCR</title>
+<title>AL SCAN V2 PRO MAX</title>
 <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
 <style>
-body{font-family:sans-serif;background:#0f172a;color:#e2e8f0;text-align:center;padding:15px;margin:0}
-h1{color:#38bdf8;margin:10px 0}
-button{background:#38bdf8;color:#0f172a;border:0;padding:12px 25px;font-size:16px;border-radius:8px;font-weight:bold;margin:5px}
-video,canvas{width:100%;max-width:400px;border:2px solid #38bdf8;border-radius:10px;margin-top:10px}
-#hasil{background:#1e293b;padding:15px;border-radius:10px;margin-top:15px;text-align:left;white-space:pre-wrap;min-height:50px}
-#loading{display:none;color:#fbbf24}
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#020617;color:#e2e8f0;margin:0;padding:10px}
+h1{color:#38bdf8;text-align:center;margin:10px 0;font-size:24px}
+.container{max-width:500px;margin:auto}
+.btn{background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#020617;border:0;padding:14px 20px;font-size:16px;border-radius:12px;font-weight:700;width:100%;margin:8px 0}
+.btn:active{transform:scale(0.98)}
+.btn-secondary{background:#1e293b;color:#38bdf8}
+.vidbox{position:relative;border-radius:16px;overflow:hidden;border:3px solid #38bdf8}
+video{width:100%;display:block;background:#000}
+.guide{position:absolute;border:2px dashed #fbbf24;top:10%;left:5%;width:90%;height:80%;pointer-events:none;border-radius:8px}
+canvas{display:none}
+.card{background:#0f172a;padding:16px;border-radius:16px;margin-top:12px;border:1px solid #1e293b}
+.card h3{margin:0 0 8px 0;color:#38bdf8;font-size:16px}
+#loading{display:none;text-align:center;color:#fbbf24;padding:20px}
+#soal,#jawaban{white-space:pre-wrap;line-height:1.6;font-size:15px}
+.loader{border:3px solid #1e293b;border-top:3px solid #38bdf8;border-radius:50%;width:30px;height:30px;animation:spin 1s linear infinite;margin:auto}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
-<h1>📚 AL SCAN V2</h1>
-<p>Arahin ke soal → pencet SCAN</p>
-<button onclick="startCam()">📷 NYALAIN KAMERA</button>
-<button onclick="capture()">📸 SCAN SOAL</button>
-<video id="video" autoplay playsinline></video>
-<canvas id="canvas" style="display:none"></canvas>
-<div id="loading">⏳ Lagi baca teks... 10 detik</div>
-<div id="hasil">Hasil scan muncul di sini</div>
+<div class="container">
+  <h1>📚 AL SCAN PRO MAX</h1>
+  <button class="btn" onclick="startCam()">📷 NYALAIN KAMERA HD</button>
+  <div class="vidbox">
+    <video id="video" autoplay playsinline></video>
+    <div class="guide"></div>
+  </div>
+  <button class="btn" onclick="capture()">📸 SCAN + JAWAB OTOMATIS</button>
+
+  <div id="loading"><div class="loader"></div><p>Lagi mikir...</p></div>
+
+  <div class="card">
+    <h3>📝 HASIL SCAN SOAL:</h3>
+    <div id="soal">Belum ada soal</div>
+  </div>
+
+  <div class="card">
+    <h3>🤖 JAWABAN AI:</h3>
+    <div id="jawaban">Jawaban muncul di sini</div>
+    <button class="btn btn-secondary" onclick="copyJawaban()">📋 COPY JAWABAN</button>
+  </div>
+</div>
+
+<canvas id="canvas"></canvas>
 
 <script>
 let stream;
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const soalEl = document.getElementById('soal');
+const jawabEl = document.getElementById('jawaban');
+const loading = document.getElementById('loading');
+
 async function startCam(){
-  const video = document.getElementById('video');
   try{
-    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:'environment',width:{ideal:2048},height:{ideal:1080}}
+    });
     video.srcObject = stream;
-  }catch(e){
-    alert('Error kamera: ' + e.message);
-  }
+  }catch(e){alert('Kamera error: '+e.message)}
 }
 
 async function capture(){
-  const video = document.getElementById('video');
-  const canvas = document.getElementById('canvas');
-  const hasil = document.getElementById('hasil');
-  const loading = document.getElementById('loading');
-  
   if(!video.srcObject) return alert('Nyalain kamera dulu bos');
-  
+
+  loading.style.display = 'block';
+  soalEl.innerText = 'Scanning...';
+  jawabEl.innerText = 'Tunggu...';
+
+  // 1. CAPTURE + PREPROCESSING HIGH
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
-  
-  loading.style.display = 'block';
-  hasil.innerText = '';
-  
-  const { data: { text } } = await Tesseract.recognize(canvas, 'ind+eng');
-  
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+
+  // Filter: Grayscale + Contrast + Sharpen
+  let imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
+  for(let i=0;i<imgData.data.length;i+=4){
+    let r=imgData.data[i], g=imgData.data[i+1], b=imgData.data[i+2];
+    let avg = 0.299*r + 0.587*g + 0.114*b; // Grayscale pro
+    let contrast = (avg-128)*1.5+128; // Naikin kontras
+    let val = contrast > 140? 255 : 0; // Threshold tajam
+    imgData.data[i]=imgData.data[i+1]=imgData.data[i+2]=val;
+  }
+  ctx.putImageData(imgData,0,0);
+
+  // 2. OCR TESSERACT
+  const { data: { text } } = await Tesseract.recognize(canvas, 'ind+eng', {
+    tessedit_pageseg_mode: 6,
+    preserve_interword_spaces: 1
+  });
+
+  const soalText = text.trim();
+  if(!soalText){
+    loading.style.display = 'none';
+    soalEl.innerText = 'Ga kebaca. Coba lebih terang/fokus';
+    return;
+  }
+  soalEl.innerText = soalText;
+
+  // 3. KIRIM KE AI BUAT JAWAB - PAKE API GRATIS
+  try{
+    const res = await fetch(`https://api-fake-putar-gpt.vercel.app/api/gpt?prompt=Jawab soal ini singkat jelas dalam bahasa Indonesia: ${encodeURIComponent(soalText)}`);
+    const data = await res.json();
+    jawabEl.innerText = data.answer || 'AI lagi error. Coba lagi';
+  }catch(e){
+    jawabEl.innerText = 'Gagal minta jawaban. Cek koneksi.\n\nSoal udah kebaca:\n'+soalText;
+  }
+
   loading.style.display = 'none';
-  hasil.innerText = text || 'Ga kebaca bos. Coba lebih deket & fokus';
+}
+
+function copyJawaban(){
+  navigator.clipboard.writeText(jawabEl.innerText);
+  alert('Jawaban udah ke-copy bos!');
 }
 </script>
 </body>
